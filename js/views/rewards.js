@@ -24,7 +24,7 @@ export function render(root) {
   const kids = S.activeChildren();
   root.append(pageHeader('Recompensas', null,
     h('button', { class: 'btn small', type: 'button', onclick: () => go('/ajustes/premios') }, 'Gestionar')));
-  if (!kids.length) { root.append(emptyState('🧒', 'Aún no hay hijos', 'Añade un hijo en Ajustes para poder canjear premios.')); return; }
+  if (!kids.length) { root.append(emptyState('🧒', 'Aún no hay miembros', 'Añade a la familia en Ajustes para poder canjear premios.')); return; }
   if (!kids.some((k) => k.id === selected)) selected = kids[0].id;
   const child = S.getChild(selected);
   const bal = S.balance(child.id);

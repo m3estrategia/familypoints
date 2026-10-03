@@ -9,6 +9,11 @@ const TYPES = [['all', 'Todo'], ['task', 'Tareas'], ['manual', 'Manuales'], ['re
 const STATUS = { pending: 'Pendiente de aprobar', approved: 'Aprobada', rejected: 'Rechazada', done: '' };
 const TYPE_LABEL = { task: 'Tarea', manual: 'Puntos manuales', redeem: 'Canje', reset: 'Reinicio' };
 
+function grantedLabel(e) {
+  const k = e.grantedBy && S.getChild(e.grantedBy);
+  return k ? `otorgado por 👑 ${k.name}` : '';
+}
+
 function matches(e) {
   if (f.child !== 'all' && e.childId !== f.child) return false;
   if (f.type === 'all') return true;
@@ -23,6 +28,7 @@ function openEntry(e) {
     h('div', { class: 'detail' }, h('div', { class: 'task-emoji big' }, e.emoji), h('h3', null, e.title),
       h('p', { class: 'muted' }, `${TYPE_LABEL[e.type] || ''}${STATUS[e.status] ? ' · ' + STATUS[e.status] : ''}`),
       h('p', { class: 'muted' }, `${child ? child.name : '—'} · ${formatRelativeDay(e.date)} ${formatTime(e.ts)}`),
+      grantedLabel(e) ? h('p', { class: 'muted' }, grantedLabel(e)) : null,
       h('p', { class: 'pts big' + (e.points < 0 ? ' neg' : '') }, signed(e.points) + ' puntos')),
     (e.status === 'approved' || e.status === 'rejected')
       ? h('button', { class: 'btn block', type: 'button', onclick: () => { S.setEntryStatus(e.id, 'pending'); sh.close(); toast('Vuelve a estar pendiente de aprobar'); } }, '↩︎ Volver a pendiente')
@@ -64,7 +70,7 @@ export function render(root) {
       child ? avatar(child, 34) : null,
       h('span', { class: 'task-emoji' }, e.emoji),
       h('span', { class: 'grow left' }, h('strong', null, e.title),
-        h('small', null, [child ? child.name : '—', formatTime(e.ts), TYPE_LABEL[e.type], STATUS[e.status]].filter(Boolean).join(' · '))),
+        h('small', null, [child ? child.name : '—', formatTime(e.ts), TYPE_LABEL[e.type], STATUS[e.status], grantedLabel(e)].filter(Boolean).join(' · '))),
       h('span', { class: 'pts' + (e.points < 0 ? ' neg' : '') }, signed(e.points))));
   });
   if (all.length > list.length) {

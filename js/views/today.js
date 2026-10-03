@@ -4,6 +4,7 @@ import { todayKey, formatLong, weekStart, addDays } from '../dates.js';
 import { h, avatar, signed, plural, vibrate, confetti, toast, emptyState, pageHeader } from '../ui.js';
 import { manualForm, childForm } from './forms.js';
 import { go } from '../router.js';
+import { leagueCard } from './crown.js';
 
 function chips(children, selected, onPick) {
   const row = h('div', { class: 'chips scroll', role: 'tablist' });
@@ -19,6 +20,7 @@ function chips(children, selected, onPick) {
 
 function complete(task, child) {
   const e = S.completeTask(task.id, child.id);
+  if (!e) { toast(`👑 ${child.name} es el Rey: no puede ganar puntos esta semana`); return; }
   vibrate(e.status === 'pending' ? 20 : [15, 40, 15]);
   if (e.status === 'pending') toast(`⏳ "${task.title}" pendiente de aprobar`, { label: 'Deshacer', fn: () => S.removeEntry(e.id) });
   else {
@@ -68,8 +70,8 @@ export function render(root) {
     h('button', { class: 'btn small primary', type: 'button', onclick: () => manualForm(sel) }, '± Puntos')));
 
   if (!kids.length) {
-    root.append(emptyState('🧒', 'Aún no hay hijos', 'Crea el primer perfil para empezar a sumar puntos.',
-      h('button', { class: 'btn primary', type: 'button', onclick: () => childForm(null) }, 'Añadir hijo')));
+    root.append(emptyState('👨‍👩‍👧', 'Aún no hay miembros', 'Añade a toda la familia, papá y mamá incluidos, para empezar a sumar puntos.',
+      h('button', { class: 'btn primary', type: 'button', onclick: () => childForm(null) }, 'Añadir miembro')));
     return;
   }
 
@@ -84,9 +86,12 @@ export function render(root) {
     scopeId ? h('div', { class: 'sum-item' }, h('span', { class: 'sum-num' }, '⭐ ' + bal), h('span', { class: 'sum-lbl' }, 'saldo')) : null,
     scopeId && streak ? h('div', { class: 'sum-item' }, h('span', { class: 'sum-num' }, '🔥 ' + streak), h('span', { class: 'sum-lbl' }, plural(streak, 'día de racha', 'días de racha'))) : null));
 
+  if (kids.length > 1 || S.currentKingId()) root.append(leagueCard());
+
   if (pending) {
+    const kingNow = S.currentKingId() && S.getChild(S.currentKingId());
     root.append(h('button', { class: 'banner', type: 'button', onclick: () => go('/aprobaciones') },
-      h('span', null, `✋ ${pending} ${plural(pending, 'tarea pendiente', 'tareas pendientes')} de aprobar`), h('span', null, 'Revisar ›')));
+      h('span', null, `✋ ${pending} ${plural(pending, 'tarea pendiente', 'tareas pendientes')} de aprobar${kingNow ? ' · 👑 Decide ' + kingNow.name : ''}`), h('span', null, 'Revisar ›')));
   }
 
   if (kids.length > 1) root.append(chips(kids, sel, (id) => S.setSetting('lastChild', id)));
@@ -98,6 +103,12 @@ export function render(root) {
   }
 
   for (const child of shown) {
+    if (child.id === S.currentKingId()) {
+      root.append(h('section', { class: 'card king-card' }, avatar(child, 44),
+        h('div', { class: 'grow' }, h('strong', null, `👑 ${child.name} es el Rey esta semana: reparte los puntos`),
+          h('small', { class: 'muted' }, 'El Rey no compite ni gana puntos durante su semana.'))));
+      continue;
+    }
     const items = S.tasksForDay(child.id, today);
     const pendingItems = items.filter((i) => !i.entry);
     const doneItems = items.filter((i) => i.entry);

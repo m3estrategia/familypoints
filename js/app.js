@@ -9,6 +9,7 @@ import * as history from './views/history.js';
 import * as stats from './views/stats.js';
 import * as settings from './views/settings.js';
 import * as onboarding from './views/onboarding.js';
+import { maybeCoronation } from './views/crown.js';
 
 applyTheme(S.getState().settings.theme);
 
@@ -26,7 +27,7 @@ const ROUTES = {
   '/historial': { view: history, tab: '/historial' },
   '/estadisticas': { view: stats, tab: '/estadisticas' },
   '/ajustes': { view: settings, tab: '/ajustes' },
-  '/ajustes/hijos': { view: { render: settings.renderChildren }, tab: '/ajustes' },
+  '/ajustes/familia': { view: { render: settings.renderChildren }, tab: '/ajustes' },
   '/ajustes/tareas': { view: { render: settings.renderTasks }, tab: '/ajustes' },
   '/ajustes/premios': { view: { render: settings.renderRewards }, tab: '/ajustes' },
 };
@@ -69,6 +70,9 @@ router.start((path, route) => {
   currentPath = path;
   draw(path, route, !changed);
 });
+
+maybeCoronation();
+document.addEventListener('visibilitychange', () => { if (!document.hidden) maybeCoronation(); });
 
 S.subscribe(() => {
   applyTheme(S.getState().settings.theme);

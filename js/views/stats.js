@@ -49,7 +49,7 @@ export function render(root) {
   const st = S.getState();
   const kids = S.activeChildren();
   root.append(pageHeader('Estadísticas'));
-  if (!kids.length) { root.append(emptyState('📊', 'Sin datos', 'Añade hijos y completa tareas para ver estadísticas.')); return; }
+  if (!kids.length) { root.append(emptyState('📊', 'Sin datos', 'Añade miembros de la familia y completa tareas para ver estadísticas.')); return; }
   if (selChild !== 'all' && !kids.some((k) => k.id === selChild)) selChild = 'all';
 
   const thisWs = weekStart(todayKey(), st.settings.weekStart);
@@ -63,7 +63,8 @@ export function render(root) {
     h('button', { class: 'nav-btn', type: 'button', 'aria-label': 'Semana siguiente', disabled: offset >= 0, onclick: () => { offset++; refresh(); } }, '›')));
 
   // Ranking
-  const rank = kids.map((c) => ({ c, pts: S.pointsInRange(c.id, ws, we), prev: S.pointsInRange(c.id, pws, pwe) })).sort((a, b) => b.pts - a.pts);
+  const standing = S.weekStanding(ws); // el Rey de esa semana no compite y va aparte
+  const rank = standing.ranking.map((r) => ({ c: S.getChild(r.id), pts: r.points })).filter((r) => r.c);
   const top = Math.max(1, ...rank.map((r) => Math.abs(r.pts)));
   const medals = ['🥇', '🥈', '🥉'];
   root.append(h('h3', { class: 'section-title' }, 'Ranking familiar'));
@@ -73,6 +74,9 @@ export function render(root) {
     h('div', { class: 'grow' }, h('strong', null, r.c.name),
       h('div', { class: 'progress thin' }, h('i', { style: { width: Math.max(2, Math.round((Math.max(0, r.pts) / top) * 100)) + '%', background: r.c.color } }))),
     h('span', { class: 'pts' + (r.pts < 0 ? ' neg' : '') }, signed(r.pts)))));
+  const kingM = standing.king && S.getChild(standing.king);
+  if (kingM) rc.append(h('div', { class: 'rank-row king-row' }, h('span', { class: 'medal' }, '👑'), avatar(kingM, 34),
+    h('div', { class: 'grow' }, h('strong', null, kingM.name), h('span', { class: 'king-tag' }, 'Rey · no compite'))));
   root.append(rc);
 
   // Selector de detalle
@@ -126,4 +130,28 @@ export function render(root) {
     }
   });
   root.append(streakCard);
+
+  // Hall de Reyes
+  root.append(h('h3', { class: 'section-title' }, '👑 Hall de Reyes'));
+  const hist = S.kingHistory();
+  if (!hist.length) root.append(h('p', { class: 'muted pad' }, 'Aún no hay reyes. El ganador de cada semana será el Rey de la siguiente.'));
+  else {
+    const crowns = new Map();
+    hist.forEach((k) => crowns.set(k.king, (crowns.get(k.king) || 0) + 1));
+    const cc = h('section', { class: 'card' });
+    [...crowns.entries()].sort((a, b) => b[1] - a[1]).forEach(([id, n]) => {
+      const m = S.getChild(id);
+      if (m) cc.append(h('div', { class: 'hist-row' }, avatar(m, 30, false), h('div', { class: 'grow' }, h('strong', null, m.name)), h('span', { class: 'count' }, '👑 ×' + n)));
+    });
+    root.append(cc);
+    const lc = h('section', { class: 'card' });
+    hist.forEach((k) => {
+      const m = S.getChild(k.king);
+      if (!m) return;
+      lc.append(h('div', { class: 'hist-row' }, avatar(m, 30, false),
+        h('div', { class: 'grow' }, h('strong', null, m.name), h('small', null, formatWeekRange(k.week) + (k.week === thisWs ? ' · esta semana' : ''))),
+        h('span', { class: 'count' }, k.points != null ? `${k.points} pts` : '')));
+    });
+    root.append(lc);
+  }
 }

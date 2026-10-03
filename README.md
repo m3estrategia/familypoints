@@ -1,6 +1,6 @@
 # FamilyPoints
 
-Web app instalable (PWA) para tareas y hábitos familiares que dan puntos a los hijos. HTML + CSS + JavaScript vanilla (módulos ES), sin build ni dependencias. Los datos se guardan solo en el dispositivo (`localStorage`, clave `fp:v1`).
+Web app instalable (PWA) para tareas y hábitos familiares que dan puntos a toda la familia. HTML + CSS + JavaScript vanilla (módulos ES), sin build ni dependencias. Los datos se guardan solo en el dispositivo (`localStorage`, clave `fp:v1`).
 
 ## Probar en local
 

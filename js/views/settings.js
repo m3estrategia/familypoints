@@ -1,4 +1,4 @@
-// Ajustes y pantallas de gestión (hijos, tareas, premios)
+// Ajustes y pantallas de gestión (familia, tareas, premios)
 import * as S from '../store.js';
 import { todayKey, DAY_NAMES, DAY_ABBR } from '../dates.js';
 import { h, avatar, signed, sheet, toast, confirmDialog, segmented, emptyState, pageHeader, applyTheme, plural } from '../ui.js';
@@ -50,7 +50,7 @@ async function resetFlow() {
   const ok = await confirmDialog({
     title: 'Reiniciar puntos', message: 'Elige cómo quieres reiniciar:', confirmText: 'Reiniciar', danger: true,
     extra: h('div', { class: 'radio-group' },
-      opt('keep', 'Saldos a cero, conservar historial', 'Se añade un movimiento de reinicio por hijo.'),
+      opt('keep', 'Saldos a cero, conservar historial', 'Se añade un movimiento de reinicio por miembro.'),
       opt('all', 'Borrarlo todo', 'Se elimina todo el historial de movimientos.')),
   });
   if (!ok) return;
@@ -67,7 +67,7 @@ export function render(root) {
 
   root.append(h('h3', { class: 'section-title' }, 'Gestionar'),
     h('section', { class: 'card' },
-      link('🧒', 'Hijos', `${S.activeChildren().length} ${plural(S.activeChildren().length, 'activo', 'activos')}`, () => go('/ajustes/hijos')),
+      link('👨‍👩‍👧', 'Familia', `${S.activeChildren().length} ${plural(S.activeChildren().length, 'activo', 'activos')}`, () => go('/ajustes/familia')),
       link('📝', 'Tareas y hábitos', `${st.tasks.length}`, () => go('/ajustes/tareas')),
       link('🎁', 'Premios', `${st.rewards.length}`, () => go('/ajustes/premios'))));
 
@@ -79,7 +79,12 @@ export function render(root) {
       h('label', { class: 'field' }, h('span', { class: 'field-label' }, 'La semana empieza el'),
         h('select', { onchange: (e) => S.setSetting('weekStart', Number(e.target.value)) },
           [1, 0, 6].map((d) => h('option', { value: d, selected: st.settings.weekStart === d }, DAY_NAMES[d]))),
-        h('span', { class: 'hint' }, 'Afecta a las tareas semanales y a las estadísticas.'))));
+        h('span', { class: 'hint' }, 'Afecta a las tareas semanales, al Rey y a las estadísticas.')),
+      h('label', { class: 'field' }, h('span', { class: 'field-label' }, '👑 Rey inicial'),
+        h('select', { onchange: (e) => S.setInitialKing(e.target.value || null) },
+          h('option', { value: '' }, 'Ninguno'),
+          S.activeChildren().map((c) => h('option', { value: c.id, selected: st.settings.initialKing === c.id && st.settings.initialKingWeek === S.currentWeek() }, `${c.avatar} ${c.name}`))),
+        h('span', { class: 'hint' }, 'Rey de esta semana, cuando aún no hay una semana anterior con datos. Solo se aplica a la semana en que lo configuras.'))));
 
   root.append(h('h3', { class: 'section-title' }, 'Juez IA'),
     h('section', { class: 'card pad' },
@@ -96,7 +101,7 @@ export function render(root) {
     h('section', { class: 'card pad form' },
       h('button', { class: 'btn danger-soft block', type: 'button', onclick: resetFlow }, '🔄 Reiniciar puntos'),
       h('button', { class: 'btn danger-soft block', type: 'button', onclick: async () => {
-        const ok = await confirmDialog({ title: '¿Borrar todos los datos?', message: 'Se eliminarán hijos, tareas, premios e historial. Exporta una copia antes si la necesitas.', confirmText: 'Borrar todo', danger: true });
+        const ok = await confirmDialog({ title: '¿Borrar todos los datos?', message: 'Se eliminarán miembros, tareas, premios e historial. Exporta una copia antes si la necesitas.', confirmText: 'Borrar todo', danger: true });
         if (ok) { S.wipeAll(); applyTheme('auto'); go('/hoy'); }
       } }, '🗑 Borrar todos los datos')));
 
@@ -116,11 +121,11 @@ const actionSheet = (title, actions) => {
   }, a.label))) });
 };
 
-/* ---------- Hijos ---------- */
+/* ---------- Familia ---------- */
 export function renderChildren(root) {
   const kids = S.getState().children;
-  root.append(subHeader('Hijos', () => childForm(null)));
-  if (!kids.length) { root.append(emptyState('🧒', 'Sin hijos', 'Añade el primer perfil.')); return; }
+  root.append(subHeader('Familia', () => childForm(null)));
+  if (!kids.length) { root.append(emptyState('👨‍👩‍👧', 'Sin miembros', 'Añade el primer miembro de la familia.')); return; }
   const card = h('section', { class: 'card' });
   kids.forEach((c) => card.append(h('button', { class: 'list-row' + (c.archived ? ' dead' : ''), type: 'button', onclick: () => actionSheet(`${c.avatar} ${c.name}`, [
     { label: '✏️ Editar', fn: () => childForm(c) },
@@ -129,7 +134,7 @@ export function renderChildren(root) {
   ]) },
   avatar(c, 40),
   h('span', { class: 'grow left' }, h('strong', null, c.name + (c.archived ? ' (archivado)' : '')),
-    h('small', null, `${c.age !== '' && c.age != null ? c.age + ' años · ' : ''}Saldo ${S.balance(c.id)} · Total ${S.totalEarned(c.id)} · 🔥 ${S.childStreak(c.id)}`)),
+    h('small', null, `${c.role === 'parent' ? 'Adulto · ' : ''}${c.age !== '' && c.age != null ? c.age + ' años · ' : ''}Saldo ${S.balance(c.id)} · Total ${S.totalEarned(c.id)} · 🔥 ${S.childStreak(c.id)}`)),
   h('span', { class: 'chev' }, '›'))));
   root.append(card);
 }

@@ -273,3 +273,26 @@ input:focus, select:focus { border-color: var(--accent); }
 .hero p { color: var(--muted); }
 
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+
+/* Selector de emoji agrupado: la rejilla nunca desborda (auto-fill) */
+.emoji-grid { grid-template-columns: repeat(auto-fill, minmax(38px, 1fr)); }
+.emoji-grid button { min-height: 40px; min-width: 0; font-size: 22px; padding: 0; }
+.emoji-group { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; }
+.emoji-group-title { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+
+/* Rey de la semana */
+.avatar { position: relative; }
+.avatar.king { overflow: visible; }
+.avatar .crown { position: absolute; top: -32%; left: 50%; transform: translateX(-50%) rotate(-8deg); line-height: 1; pointer-events: none; }
+.king-card { padding: 14px 16px; display: flex; align-items: center; gap: 12px; }
+.king-card strong { display: block; }
+.league-head { display: flex; justify-content: space-between; align-items: baseline; padding: 12px 16px 6px; }
+.league-head small { color: var(--muted); }
+.league-note { padding: 0 16px 10px; font-size: 13px; color: var(--muted); }
+.rank-row.king-row { background: rgba(255,204,0,.12); }
+.rank-row small { color: var(--muted); }
+.king-tag { font-size: 12px; font-weight: 700; color: var(--orange); }
+.decides { font-size: 13px; font-weight: 600; color: var(--orange); padding: 0 16px 8px; }
+.coronation { text-align: center; display: flex; flex-direction: column; gap: 8px; align-items: center; }
+.coronation .big-crown { font-size: 56px; line-height: 1; }
+.coronation .rank-row { width: 100%; text-align: left; }

@@ -1,13 +1,17 @@
 // Capa de datos: estado único en localStorage ('fp:v1') + selectores derivados del ledger.
-import { todayKey, addDays, dow, weekStart } from './dates.js';
+import { todayKey, addDays, dow, weekStart, diffDays } from './dates.js';
+export const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 
-export const APP_VERSION = '1.0.0';
-export const STORAGE_KEY = 'fp:v1';
-export const SCHEMA_VERSION = 1;
+export const APP_VERSION = '1.1.0';
+export const STORAGE_KEY = 'fp:v1'; // se mantiene la clave para no perder datos de la v1
+export const SCHEMA_VERSION = 2;
 
 const defaults = () => ({
   schema: SCHEMA_VERSION,
-  settings: { theme: 'auto', weekStart: 1, onboarded: false, aiJudge: false, lastChild: 'all' },
+  settings: {
+    theme: 'auto', weekStart: 1, onboarded: false, aiJudge: false, lastChild: 'all',
+    initialKing: null, initialKingWeek: null, lastCoronationShown: null,
+  },
   children: [],
   tasks: [],
   rewards: [],
@@ -16,7 +20,11 @@ const defaults = () => ({
 
 // Migraciones: migrations[n] convierte de la versión n a n+1.
 const migrations = {
-  // 1: (s) => { ...; return s; },
+  // v1 -> v2: los perfiles pasan a ser miembros de la familia con rol (todo lo existente son niños).
+  1: (s) => {
+    (Array.isArray(s.children) ? s.children : []).forEach((c) => { if (!c.role) c.role = 'child'; });
+    return s;
+  },
 };
 export function migrate(raw) {
   let s = raw && typeof raw === 'object' ? raw : defaults();
@@ -25,20 +33,43 @@ export function migrate(raw) {
   const d = defaults();
   const out = { ...d, ...s, settings: { ...d.settings, ...(s.settings || {}) }, schema: SCHEMA_VERSION };
   for (const k of ['children', 'tasks', 'rewards', 'ledger']) if (!Array.isArray(out[k])) out[k] = [];
+  out.children.forEach((c) => { if (c.role !== 'parent' && c.role !== 'child') c.role = 'child'; });
+  repairMissingIds(out);
   return out;
 }
 
+// v1.0/v1.1 guardaban miembros, tareas y premios creados desde formulario sin id (bug en saveX).
+// Se les asigna uno; los movimientos huérfanos se atribuyen al primer miembro reparado y,
+// en tareas, a la tarea con el mismo título.
+function repairMissingIds(s) {
+  const fix = (list) => { let first = null; list.forEach((x) => { if (!x.id) { x.id = uid(); first = first || x.id; } }); return first; };
+  const kid = fix(s.children);
+  fix(s.tasks);
+  fix(s.rewards);
+  s.ledger.forEach((e) => {
+    if (!e.id) e.id = uid();
+    if (!e.childId && kid) e.childId = kid;
+    const list = e.type === 'task' ? s.tasks : e.type === 'redeem' ? s.rewards : null;
+    const match = list && !e.refId && list.find((x) => x.title === e.title);
+    if (match) e.refId = match.id;
+  });
+}
+
 let state;
+let memo; // caché de cálculos derivados del rey; se invalida en cada cambio de estado
+function resetMemo() { memo = { king: new Map(), standing: new Map(), first: undefined }; }
 const listeners = new Set();
 
 function load() {
   try {
     const txt = localStorage.getItem(STORAGE_KEY);
     state = migrate(txt ? JSON.parse(txt) : null);
+    if (txt) save(); // persiste migraciones y reparaciones de ids para que sean estables
   } catch (e) {
     console.error('No se pudo leer el almacenamiento', e);
     state = defaults();
   }
+  resetMemo();
 }
 function save() {
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
@@ -48,20 +79,24 @@ load();
 
 export const getState = () => state;
 export const subscribe = (fn) => { listeners.add(fn); return () => listeners.delete(fn); };
-function commit(fn) { const r = fn(state); save(); listeners.forEach((l) => l()); return r; }
+function commit(fn) { const r = fn(state); resetMemo(); save(); listeners.forEach((l) => l()); return r; }
 
-export const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 
 /* ---------- Ajustes ---------- */
 export const setSetting = (k, v) => commit((s) => { s.settings[k] = v; });
+// Rey inicial: solo vale para la semana en que se configura (id = null para ninguno).
+export const setInitialKing = (id) => commit((s) => {
+  s.settings.initialKing = id || null;
+  s.settings.initialKingWeek = id ? weekStart(todayKey(), s.settings.weekStart) : null;
+});
 
-/* ---------- Hijos ---------- */
+/* ---------- Miembros de la familia (en state.children por compatibilidad con v1) ---------- */
 export const activeChildren = () => state.children.filter((c) => !c.archived);
 export const getChild = (id) => state.children.find((c) => c.id === id);
 export function saveChild(data) {
   return commit((s) => {
     if (data.id) { Object.assign(s.children.find((c) => c.id === data.id), data); return data.id; }
-    const c = { id: uid(), archived: false, createdAt: Date.now(), ...data };
+    const c = { archived: false, createdAt: Date.now(), ...data, id: uid() };
     s.children.push(c);
     return c.id;
   });
@@ -81,7 +116,7 @@ export function deleteChild(id) {
 export function saveTask(data) {
   return commit((s) => {
     if (data.id) { Object.assign(s.tasks.find((t) => t.id === data.id), data); return data.id; }
-    const t = { id: uid(), createdAt: Date.now(), ...data };
+    const t = { createdAt: Date.now(), ...data, id: uid() };
     s.tasks.push(t);
     return t.id;
   });
@@ -97,7 +132,7 @@ export const taskAppliesTo = (t, childId) => !t.childIds.length || t.childIds.in
 /* ---------- Premios ---------- */
 export const saveReward = (data) => commit((s) => {
   if (data.id) { Object.assign(s.rewards.find((r) => r.id === data.id), data); return data.id; }
-  const r = { id: uid(), ...data };
+  const r = { ...data, id: uid() };
   s.rewards.push(r);
   return r.id;
 });
@@ -112,6 +147,8 @@ const isEarning = (e) => (e.type === 'task' || e.type === 'manual') && counts(e)
 
 function addEntry(e) {
   const entry = { id: uid(), ts: Date.now(), date: todayKey(), status: 'done', ...e };
+  const king = (e.type === 'task' || e.type === 'manual') ? currentKingId() : null;
+  if (king) entry.grantedBy = king;
   commit((s) => { s.ledger.push(entry); });
   return entry;
 }
@@ -133,6 +170,7 @@ export const pendingEntries = () => state.ledger.filter((e) => e.type === 'task'
   .sort((a, b) => a.ts - b.ts);
 
 export function manualPoints({ childId, points, title, emoji }) {
+  if (childId === currentKingId()) return null; // el Rey no gana ni pierde puntos en su semana
   return addEntry({ childId, type: 'manual', points, title, emoji: emoji || (points >= 0 ? '⭐' : '⚠️') });
 }
 export function redeem(rewardId, childId) {
@@ -144,8 +182,87 @@ export function redeem(rewardId, childId) {
 }
 export const removeEntry = (id) => commit((s) => { s.ledger = s.ledger.filter((e) => e.id !== id); });
 export const setEntryStatus = (id, status) => commit((s) => { s.ledger.find((e) => e.id === id).status = status; });
-export const approveEntry = (id) => setEntryStatus(id, 'approved');
+export const approveEntry = (id) => commit((s) => {
+  const e = s.ledger.find((x) => x.id === id);
+  e.status = 'approved';
+  const king = currentKingId();
+  if (king) e.grantedBy = king; else delete e.grantedBy;
+});
 export const rejectEntry = (id) => setEntryStatus(id, 'rejected');
+
+/* ---------- Rey de la semana (todo derivado del ledger; nada se almacena) ---------- */
+// Semana W = clave de su día de inicio. Rey(W) = ganador(W-1), o el "Rey inicial" si se configuró para W.
+// Ganador(W) = más puntos netos aprobados en W (sin contar a Rey(W)); desempates: más tareas, quien llegó antes.
+const normWeek = (k) => weekStart(k, state.settings.weekStart);
+export const currentWeek = () => normWeek(todayKey());
+export const currentKingId = () => kingOf(currentWeek());
+
+// Primera semana con datos (primer movimiento que suma) o semana del rey inicial; null si no hay nada.
+function firstWeek() {
+  if (memo.first !== undefined) return memo.first;
+  let min = null;
+  for (const e of state.ledger) if (isEarning(e) && (min === null || e.date < min)) min = e.date;
+  let w = min === null ? null : normWeek(min);
+  const iw = state.settings.initialKingWeek;
+  if (state.settings.initialKing && iw && (w === null || iw < w)) w = iw;
+  memo.first = w;
+  return w;
+}
+
+// Clasificación de la semana W: {week, king, ranking:[{id,points,tasks,ts}], winner}. Solo miembros activos que compiten.
+export function weekStanding(weekStartDate) {
+  const W = normWeek(weekStartDate);
+  if (memo.standing.has(W)) return memo.standing.get(W);
+  const king = kingOf(W);
+  const end = addDays(W, 6);
+  const acc = new Map();
+  for (const c of state.children) if (!c.archived && c.id !== king) acc.set(c.id, { id: c.id, points: 0, tasks: 0, ts: 0 });
+  const es = state.ledger.filter((e) => isEarning(e) && e.date >= W && e.date <= end && acc.has(e.childId)).sort((a, b) => a.ts - b.ts);
+  for (const e of es) {
+    const r = acc.get(e.childId);
+    r.points += e.points;
+    if (e.type === 'task' && e.points > 0) r.tasks++;
+    if (e.points !== 0) r.ts = e.ts; // movimiento con el que llegó a su total final
+  }
+  const ranking = [...acc.values()].sort((a, b) => b.points - a.points || b.tasks - a.tasks || a.ts - b.ts);
+  const winner = ranking.length && ranking[0].points > 0 ? ranking[0] : null;
+  const res = { week: W, king, ranking, winner };
+  memo.standing.set(W, res);
+  return res;
+}
+export const weekWinner = (weekStartDate) => weekStanding(weekStartDate).winner?.id ?? null;
+
+export function kingOf(weekStartDate) {
+  const W = normWeek(weekStartDate);
+  if (memo.king.has(W)) return memo.king.get(W);
+  const start = firstWeek();
+  if (start === null || W < start) return null;
+  // Iterativo desde la primera semana con datos (sin recursión profunda); cada semana queda memoizada.
+  const { initialKing, initialKingWeek } = state.settings;
+  for (let w = start; w <= W; w = addDays(w, 7)) {
+    if (memo.king.has(w)) continue;
+    let k = null;
+    if (initialKing && initialKingWeek === w && state.children.some((c) => c.id === initialKing && !c.archived)) k = initialKing;
+    else if (w > start) k = weekWinner(addDays(w, -7));
+    memo.king.set(w, k);
+  }
+  return memo.king.get(W);
+}
+
+// Semanas con rey, de la más reciente (la actual) a la más antigua: [{week, king, points}]
+export function kingHistory() {
+  const start = firstWeek(), cur = currentWeek(), out = [];
+  if (start === null) return out;
+  for (let w = cur; w >= start; w = addDays(w, -7)) {
+    const k = kingOf(w);
+    if (!k) continue;
+    const prev = w > start ? weekStanding(addDays(w, -7)).winner : null;
+    out.push({ week: w, king: k, points: prev && prev.id === k ? prev.points : null });
+  }
+  return out;
+}
+// Días que quedan de la semana en curso, contando hoy.
+export const daysLeftInWeek = () => Math.max(0, diffDays(addDays(currentWeek(), 7), todayKey()));
 
 /* ---------- Tareas del día (derivado del ledger) ---------- */
 export const repeatable = (t) => t.points < 0; // las penalizaciones se pueden aplicar varias veces
@@ -183,6 +300,7 @@ export function tasksForDay(childId, dateKey = todayKey()) {
 
 export function completeTask(taskId, childId) {
   const t = getTask(taskId);
+  if (childId === currentKingId()) return null; // el Rey no compite en su semana
   return addEntry({
     childId, type: 'task', refId: t.id, title: t.title, emoji: t.emoji, points: t.points,
     status: t.requiresApproval ? 'pending' : 'done', habit: !!t.isHabit,

@@ -1,6 +1,8 @@
 // Utilidades de interfaz: constructor DOM seguro, hojas modales, diálogos, toasts, confeti, vibración.
 // Todo el texto se inserta con textContent / nodos de texto (nunca innerHTML con datos del usuario).
 
+import { currentKingId } from './store.js';
+
 export function h(tag, attrs, ...children) {
   const el = document.createElement(tag);
   if (attrs) {
@@ -38,12 +40,14 @@ export function applyTheme(theme) {
 }
 
 /* ---------- Avatar ---------- */
-export function avatar(child, size = 40) {
+// Si el miembro es el Rey de la semana actual, lleva una corona encima (crown = false para desactivarla).
+export function avatar(child, size = 40, crown = true) {
+  const isKing = crown && currentKingId() === child.id;
   return h('span', {
-    class: 'avatar',
+    class: 'avatar' + (isKing ? ' king' : ''),
     style: { width: size + 'px', height: size + 'px', fontSize: Math.round(size * 0.55) + 'px', background: child.color + '33', borderColor: child.color },
     'aria-hidden': 'true',
-  }, child.avatar);
+  }, child.avatar, isKing ? h('span', { class: 'crown', style: { fontSize: Math.max(12, Math.round(size * 0.4)) + 'px' } }, '👑') : null);
 }
 
 /* ---------- Hojas modales ---------- */
@@ -164,17 +168,28 @@ export function segmented(options, value, onChange) {
 }
 
 // Selector de emoji: campo de texto + cuadrícula de sugerencias. Devuelve {el, get}
+// suggestions: array plano de emojis, o array de grupos [{title, items}] (se muestra un título pequeño por grupo).
 export function emojiPicker(value, suggestions) {
-  const input = h('input', { type: 'text', class: 'emoji-input', value: value || '', maxLength: 8, 'aria-label': 'Emoji' });
-  const grid = h('div', { class: 'emoji-grid' }, suggestions.map((e) => h('button', {
+  const input = h('input', { type: 'text', class: 'emoji-input', value: value || '', maxLength: 16, 'aria-label': 'Emoji' });
+  const btns = (list) => h('div', { class: 'emoji-grid' }, list.map((e) => h('button', {
     type: 'button', 'aria-label': e, onclick: () => { input.value = e; },
   }, e)));
-  return { el: h('div', { class: 'field' }, h('span', { class: 'field-label' }, 'Emoji'), input, grid), get: () => input.value.trim() };
+  const grouped = suggestions.length && typeof suggestions[0] === 'object';
+  const body = grouped
+    ? suggestions.map((g) => h('div', { class: 'emoji-group' }, h('span', { class: 'emoji-group-title' }, g.title), btns(g.items)))
+    : btns(suggestions);
+  return { el: h('div', { class: 'field' }, h('span', { class: 'field-label' }, 'Emoji'), input, body), get: () => input.value.trim() };
 }
 
 export const EMOJIS_TASK = ['🛏️', '🪥', '🧸', '📚', '🍽️', '📖', '🧽', '🧹', '👕', '🐶', '🌱', '🗑️', '🎒', '🛁', '💊', '🎹', '⚽', '🧠', '✏️', '😠', '📵', '🤝', '⭐', '💪'];
 export const EMOJIS_REWARD = ['📺', '🍕', '🛝', '🎬', '🍦', '🎁', '🎮', '🧁', '🚲', '🏊', '🛍️', '🌙', '🎨', '🍿', '🎢', '👑'];
-export const EMOJIS_AVATAR = ['🦁', '🐯', '🐼', '🦊', '🐸', '🐵', '🐰', '🐶', '🐱', '🦄', '🐙', '🦋', '🐧', '🐢', '🚀', '⚽', '👧', '👦', '🧒', '👶'];
+export const EMOJI_AVATAR_GROUPS = [
+  { title: 'Héroes', items: ['🦸‍♂️', '🦸‍♀️', '🦹‍♂️', '🦹‍♀️', '🕷️', '🦇', '⚡', '🛡️', '🔨', '🦾', '🥷', '🤖', '🚀', '🐺', '🦅', '🔥'] },
+  { title: 'Princesas y fantasía', items: ['👸', '🤴', '🧜‍♀️', '🧜‍♂️', '🧚‍♀️', '🧚‍♂️', '🦄', '🏰', '👑', '💎', '🌹', '❄️', '🐉', '🧞', '🧙‍♀️', '🧙‍♂️'] },
+  { title: 'Personajes', items: ['🧛', '🧟', '👽', '👻', '🤠', '🏴‍☠️', '🦁', '🐯', '🐼', '🦊', '🐸', '🐵', '🐶', '🐱', '🐧', '🐢'] },
+  { title: 'Familia', items: ['👩', '👨', '👧', '👦', '👵', '👴', '🧔', '👱‍♀️'] },
+];
+export const EMOJIS_AVATAR = EMOJI_AVATAR_GROUPS.flatMap((g) => g.items);
 export const COLORS = ['#ff4a80', '#ff9500', '#ffcc00', '#34c759', '#32ade6', '#5e5ce6', '#af52de', '#8e6e53'];
 
 export function colorPicker(value, onChange) {
@@ -190,8 +205,8 @@ export function colorPicker(value, onChange) {
   return h('div', { class: 'field' }, h('span', { class: 'field-label' }, 'Color'), wrap);
 }
 
-// Chips de selección de hijos (multiselección). Devuelve {el, get}
-export function childMultiSelect(children, selected, label = 'Asignar a', emptyText = 'Todos los hijos') {
+// Chips de selección de miembros (multiselección). Devuelve {el, get}
+export function childMultiSelect(children, selected, label = 'Asignar a', emptyText = 'Todos') {
   const sel = new Set(selected);
   const wrap = h('div', { class: 'chips wrap' });
   const render = () => {

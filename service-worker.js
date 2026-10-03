@@ -1,10 +1,10 @@
 // Cache-first. Cambia CACHE_VERSION al publicar cambios para invalidar la caché.
-const CACHE_VERSION = 'familypoints-v1.0.0';
+const CACHE_VERSION = 'familypoints-v1.1.0';
 const ASSETS = [
   './', './index.html', './manifest.webmanifest', './css/styles.css',
   './js/app.js', './js/store.js', './js/router.js', './js/dates.js', './js/ui.js', './js/ai-judge.js',
   './js/views/today.js', './js/views/approvals.js', './js/views/rewards.js', './js/views/history.js',
-  './js/views/stats.js', './js/views/settings.js', './js/views/forms.js', './js/views/onboarding.js',
+  './js/views/stats.js', './js/views/settings.js', './js/views/forms.js', './js/views/onboarding.js', './js/views/crown.js',
   './icons/icon-180.png', './icons/icon-192.png', './icons/icon-512.png',
 ];
 

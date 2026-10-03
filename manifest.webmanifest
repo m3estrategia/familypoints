@@ -1,7 +1,7 @@
 {
   "name": "FamilyPoints",
   "short_name": "FamilyPoints",
-  "description": "Tareas y hábitos familiares que dan puntos a los hijos.",
+  "description": "Tareas y hábitos familiares que dan puntos a toda la familia.",
   "lang": "es",
   "start_url": "./index.html#/hoy",
   "scope": "./",

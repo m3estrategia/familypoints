@@ -8,6 +8,8 @@ export function render(root) {
   const list = S.pendingEntries();
   root.append(pageHeader('Aprobaciones', null, h('button', { class: 'btn-text', type: 'button', onclick: () => back('/hoy') }, '‹ Hoy')));
   if (!list.length) { root.append(emptyState('✅', 'Todo al día', 'No hay tareas pendientes de aprobar.')); return; }
+  const king = S.currentKingId() && S.getChild(S.currentKingId());
+  if (king) root.append(h('p', { class: 'decides' }, '👑 Decide ' + king.name));
   const card = h('section', { class: 'card' });
   list.forEach((e) => {
     const child = S.getChild(e.childId);
