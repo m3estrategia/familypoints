@@ -2,15 +2,16 @@
 import { todayKey, addDays, dow, weekStart, diffDays } from './dates.js';
 export const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 
-export const APP_VERSION = '1.2.0';
+export const APP_VERSION = '1.3.0';
 export const STORAGE_KEY = 'fp:v1'; // se mantiene la clave para no perder datos de la v1
-export const SCHEMA_VERSION = 3;
+export const SCHEMA_VERSION = 4;
 
 const defaults = () => ({
   schema: SCHEMA_VERSION,
   settings: {
     theme: 'auto', weekStart: 1, onboarded: false, aiJudge: false, lastChild: 'all',
     initialKing: null, initialKingWeek: null, lastCoronationShown: null,
+    pushEnabled: false, pushCode: null,
   },
   children: [],
   tasks: [],
@@ -40,6 +41,11 @@ const migrations = {
     (Array.isArray(s.children) ? s.children : []).forEach((c) => { if (c.gender !== 'f' && c.gender !== 'm') c.gender = guessGender(c); });
     return s;
   },
+  // v3 -> v4: las tareas tienen orden manual (según su posición actual en el array).
+  3: (s) => {
+    (Array.isArray(s.tasks) ? s.tasks : []).forEach((t, i) => { t.order = i; });
+    return s;
+  },
 };
 export function migrate(raw) {
   let s = raw && typeof raw === 'object' ? raw : defaults();
@@ -51,6 +57,11 @@ export function migrate(raw) {
   out.children.forEach((c) => { if (c.role !== 'parent' && c.role !== 'child') c.role = 'child'; });
   out.children.forEach((c) => { if (c.gender !== 'f' && c.gender !== 'm') c.gender = guessGender(c); });
   repairMissingIds(out);
+  // Tareas sin order válido (p. ej. copias importadas a mano): se les asigna tras las que ya lo tienen.
+  if (out.tasks.some((t) => !Number.isFinite(t.order))) {
+    let next = out.tasks.reduce((m, t) => (Number.isFinite(t.order) ? Math.max(m, t.order) : m), -1) + 1;
+    out.tasks.forEach((t) => { if (!Number.isFinite(t.order)) t.order = next++; });
+  }
   return out;
 }
 
@@ -134,16 +145,33 @@ export function deleteChild(id) {
 export function saveTask(data) {
   return commit((s) => {
     if (data.id) { Object.assign(s.tasks.find((t) => t.id === data.id), data); return data.id; }
-    const t = { createdAt: Date.now(), ...data, id: uid() };
+    const t = { createdAt: Date.now(), ...data, id: uid(), order: nextOrder(s) };
     s.tasks.push(t);
     return t.id;
   });
 }
+const nextOrder = (s) => s.tasks.reduce((m, t) => Math.max(m, Number.isFinite(t.order) ? t.order : -1), -1) + 1;
+// Tareas ordenadas por `order` (estable).
+export const sortedTasks = () => state.tasks.map((t, i) => [t, i]).sort((a, b) => a[0].order - b[0].order || a[1] - b[1]).map((x) => x[0]);
 export const getTask = (id) => state.tasks.find((t) => t.id === id);
+// La copia queda justo después de la original; el resto se renumera.
 export function duplicateTask(id) {
-  const t = getTask(id);
-  return saveTask({ ...t, id: undefined, title: t.title + ' (copia)', createdAt: Date.now() });
+  return commit((s) => {
+    const t = s.tasks.find((x) => x.id === id);
+    const c = { ...t, title: t.title + ' (copia)', createdAt: Date.now(), id: uid(), order: t.order + 0.5 };
+    s.tasks.push(c);
+    s.tasks.map((x, i) => [x, i]).sort((a, b) => a[0].order - b[0].order || a[1] - b[1]).forEach(([x], i) => { x.order = i; });
+    return c.id;
+  });
 }
+// ids en el nuevo orden; las tareas no incluidas van al final conservando su orden relativo.
+export const reorderTasks = (idsInOrder) => commit((s) => {
+  const pos = new Map(idsInOrder.map((id, i) => [id, i]));
+  const rest = s.tasks.filter((t) => !pos.has(t.id)).sort((a, b) => a.order - b.order);
+  const head = idsInOrder.map((id) => s.tasks.find((t) => t.id === id)).filter(Boolean);
+  [...head, ...rest].forEach((t, i) => { t.order = i; });
+  s.tasks.sort((a, b) => a.order - b.order);
+});
 export const deleteTask = (id) => commit((s) => { s.tasks = s.tasks.filter((t) => t.id !== id); });
 export const taskAppliesTo = (t, childId) => !t.childIds.length || t.childIds.includes(childId);
 
@@ -306,7 +334,7 @@ function taskEntries(t, childId, dateKey) {
 // Devuelve [{task, entry, count, last}] para el hijo en dateKey. entry = movimiento que completa la tarea en su periodo.
 export function tasksForDay(childId, dateKey = todayKey()) {
   const out = [];
-  for (const t of state.tasks) {
+  for (const t of sortedTasks()) {
     if (!taskAppliesTo(t, childId) || !taskScheduled(t, dateKey)) continue;
     const es = taskEntries(t, childId, dateKey).sort((x, y) => x.ts - y.ts);
     const last = es.length ? es[es.length - 1] : null;
@@ -412,7 +440,7 @@ export const SAMPLE_REWARDS = [
 export function loadSamples({ tasks, rewards }) {
   commit((s) => {
     if (tasks) SAMPLE_TASKS.forEach((t) => s.tasks.push({ id: uid(), childIds: [], days: [], date: null,
-      requiresApproval: false, isHabit: false, createdAt: Date.now(), ...t }));
+      requiresApproval: false, isHabit: false, createdAt: Date.now(), ...t, order: nextOrder(s) }));
     if (rewards) SAMPLE_REWARDS.forEach((r) => s.rewards.push({ id: uid(), childIds: [], ...r }));
   });
 }

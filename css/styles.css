@@ -296,3 +296,16 @@ input:focus, select:focus { border-color: var(--accent); }
 .coronation { text-align: center; display: flex; flex-direction: column; gap: 8px; align-items: center; }
 .coronation .big-crown { font-size: 56px; line-height: 1; }
 .coronation .rank-row { width: 100%; text-align: left; }
+
+/* Ordenar tareas, propuestas y aviso diario */
+.card.sorting { overflow: visible; }
+.sort-row { position: relative; background: var(--card); user-select: none; -webkit-user-select: none; }
+.sort-row.dragging { z-index: 5; box-shadow: 0 8px 24px rgba(0,0,0,.25); border-radius: 12px; transition: none; }
+.sort-row:not(.dragging) { transition: transform .15s; }
+.drag-handle { touch-action: none; cursor: grab; font-size: 22px; color: var(--muted); width: 44px; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; flex: none; margin-left: -10px; }
+.move-btns { display: flex; flex-direction: column; flex: none; }
+.move-btns button { min-width: 36px; min-height: 22px; font-size: 12px; color: var(--muted); }
+.move-btns button:disabled { opacity: .25; }
+.sug-title { background: none; }
+.btn:disabled { opacity: .55; }
+textarea[readonly] { width: 100%; font: 12px/1.3 ui-monospace, Menlo, monospace; padding: 8px; border-radius: 10px; border: 1px solid var(--sep); background: var(--fill); resize: none; }

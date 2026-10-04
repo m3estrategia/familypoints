@@ -46,7 +46,9 @@ export function childForm(child, onSaved) {
 }
 
 /* ---------- Tarea ---------- */
+// `task` sin id = formulario prellenado para una tarea nueva (p. ej. desde una propuesta).
 export function taskForm(task, onSaved) {
+  const isNew = !task?.id;
   const kids = S.activeChildren();
   const d = {
     freq: task?.freq || 'daily', days: [...(task?.days || [])], isHabit: !!task?.isHabit, approval: !!task?.requiresApproval,
@@ -99,8 +101,8 @@ export function taskForm(task, onSaved) {
   field('Frecuencia', freqSel), dynamic,
   toggle('Requiere aprobación', 'Los puntos se suman cuando la apruebas', 'approval'),
   toggle('Es un hábito', 'Cuenta para la racha', 'isHabit'),
-  h('button', { class: 'btn primary block', type: 'submit' }, task ? 'Guardar' : 'Crear tarea'));
-  const sh = sheet({ title: task ? 'Editar tarea' : 'Nueva tarea', content: form, full: true });
+  h('button', { class: 'btn primary block', type: 'submit' }, isNew ? 'Crear tarea' : 'Guardar'));
+  const sh = sheet({ title: isNew ? 'Nueva tarea' : 'Editar tarea', content: form, full: true });
   return sh;
 }
 

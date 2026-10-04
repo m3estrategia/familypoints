@@ -117,7 +117,7 @@ export function render(root) {
   root.append(h('h3', { class: 'section-title' }, 'Rachas de hábitos'));
   const streakCard = h('section', { class: 'card' });
   (scope ? [child] : kids).forEach((c) => {
-    const habits = st.tasks.filter((t) => t.isHabit && S.taskAppliesTo(t, c.id));
+    const habits = S.sortedTasks().filter((t) => t.isHabit && S.taskAppliesTo(t, c.id));
     streakCard.append(h('div', { class: 'child-head' }, avatar(c, 30), h('div', { class: 'grow' }, h('strong', null, c.name)),
       h('span', { class: 'count' }, `🔥 ${S.childStreak(c.id)} ${plural(S.childStreak(c.id), 'día', 'días')}`)));
     if (scope) {

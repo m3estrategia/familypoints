@@ -150,11 +150,11 @@ test('migración desde datos v1 sin pérdida', async () => {
   const copy = JSON.parse(JSON.stringify(v1));
   const S = await load(v1);
   const st = S.getState();
-  assert.equal(st.schema, 3);
+  assert.equal(st.schema, 4);
   assert.ok(st.children.every((c) => c.role === 'child'));
   assert.equal(st.children[0].name, 'Ana');
   assert.equal(st.children[1].archived, true);
-  assert.deepEqual(st.tasks, copy.tasks);
+  assert.deepEqual(st.tasks, copy.tasks.map((t, i) => ({ ...t, order: i })));
   assert.deepEqual(st.rewards, copy.rewards);
   assert.deepEqual(st.ledger, copy.ledger);
   assert.equal(st.settings.theme, 'dark');
@@ -165,7 +165,7 @@ test('migración desde datos v1 sin pérdida', async () => {
   // Importar una copia v1 también migra
   S.importJSON(JSON.stringify({ app: 'FamilyPoints', data: copy }));
   assert.equal(S.getState().children[0].role, 'child');
-  assert.equal(S.APP_VERSION, '1.2.0');
+  assert.equal(S.APP_VERSION, '1.3.0');
   assert.ok(S.getState().children.every((c) => c.gender === 'm' || c.gender === 'f'));
 });
 
@@ -176,7 +176,7 @@ test('migración de gender: avatar y nombre', async () => {
       mk('s', 'Sira', '🦸‍♀️'), mk('v', 'Eva', '🧜‍♀️'), mk('k', 'Kai', '🙂', { gender: 'f' })] });
   const g = Object.fromEntries(S.getState().children.map((c) => [c.id, c.gender]));
   assert.deepEqual(g, { p: 'f', l: 'm', m: 'f', a: 'f', s: 'f', v: 'f', k: 'f' });
-  assert.equal(S.getState().schema, 3);
+  assert.equal(S.getState().schema, 4);
 });
 
 test('royal() devuelve las palabras según el género', async () => {
@@ -185,6 +185,52 @@ test('royal() devuelve las palabras según el género', async () => {
   assert.deepEqual(royal({ gender: 'f' }), { title: 'Reina', theNew: 'la nueva Reina', the: 'la Reina', viva: '¡Viva la Reina!' });
   assert.deepEqual(royal({ gender: 'm' }), { title: 'Rey', theNew: 'el nuevo Rey', the: 'el Rey', viva: '¡Viva el Rey!' });
   assert.equal(royal(undefined).title, 'Rey');
+});
+
+const tk = (id, extra = {}) => ({ id, title: id, emoji: '⭐', points: 1, childIds: [], freq: 'daily', days: [], ...extra });
+const order = (S) => S.sortedTasks().map((t) => t.id);
+
+test('migración v3 -> v4: order según el array, sin perder datos', async () => {
+  const tasks = [tk('x'), tk('y'), tk('z')];
+  const S = await load(base([], { schema: 3, tasks: JSON.parse(JSON.stringify(tasks)) }));
+  const st = S.getState();
+  assert.equal(st.schema, 4);
+  assert.deepEqual(st.tasks.map((t) => [t.id, t.order, t.title]), [['x', 0, 'x'], ['y', 1, 'y'], ['z', 2, 'z']]);
+  assert.deepEqual(S.tasksForDay('a').map((r) => r.task.id), ['x', 'y', 'z']);
+  assert.equal(JSON.parse(globalThis.localStorage.getItem('fp:v1')).schema, 4); // persistida
+});
+
+test('reorderTasks, tareas nuevas al final y duplicado tras la original', async () => {
+  const S = await load(base([], { schema: 4, tasks: [tk('x', { order: 0 }), tk('y', { order: 1 }), tk('z', { order: 2 })] }));
+  S.reorderTasks(['z', 'x', 'y']);
+  assert.deepEqual(order(S), ['z', 'x', 'y']);
+  assert.deepEqual(S.tasksForDay('a').map((r) => r.task.id), ['z', 'x', 'y']);
+  assert.deepEqual(S.getState().tasks.map((t) => t.order), [0, 1, 2]);
+  S.reorderTasks(['y']); // ids parciales: el resto conserva su orden relativo
+  assert.deepEqual(order(S), ['y', 'z', 'x']);
+  const n = S.saveTask({ title: 'nueva', emoji: '⭐', points: 1, childIds: [], freq: 'daily' });
+  assert.equal(order(S).at(-1), n);
+  const d = S.duplicateTask('z');
+  assert.deepEqual(order(S), ['y', 'z', d, 'x', n]);
+  assert.deepEqual(S.sortedTasks().map((t) => t.order), [0, 1, 2, 3, 4]);
+});
+
+test('añadir una propuesta como tarea (y detectar duplicado por título)', async () => {
+  const S = await load(base([]));
+  const { SUGGESTIONS, suggestionToTask, hasTaskWithTitle } = await import('../js/suggestions.js');
+  const pos = SUGGESTIONS.filter((x) => x.kind === 'pos'), neg = SUGGESTIONS.filter((x) => x.kind === 'neg');
+  assert.ok(pos.length >= 12 && pos.length <= 18 && neg.length >= 12 && neg.length <= 18);
+  assert.ok(pos.every((x) => x.points >= 1 && x.points <= 5) && neg.every((x) => x.points <= -1 && x.points >= -5));
+  const sug = neg.find((x) => x.title === 'Pelear o gritar');
+  assert.equal(hasTaskWithTitle(S.getState().tasks, sug.title), false);
+  const id = S.saveTask(suggestionToTask(sug));
+  const t = S.getTask(id);
+  assert.ok(t.id && t.id === id && t.order === 0);
+  assert.deepEqual([t.title, t.points, t.freq, t.childIds], [sug.title, sug.points, 'daily', []]);
+  assert.ok(S.repeatable(t));
+  assert.equal(hasTaskWithTitle(S.getState().tasks, ' pelear o gritar '), true);
+  S.deleteTask(id); // deshacer
+  assert.equal(S.getState().tasks.length, 0);
 });
 
 let fail = 0;
