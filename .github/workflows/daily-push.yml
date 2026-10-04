@@ -1,0 +1,49 @@
+name: Aviso diario
+
+on:
+  schedule:
+    - cron: '30 18 * * *' # 20:30 Madrid en verano (UTC+2)
+    - cron: '30 19 * * *' # 20:30 Madrid en invierno (UTC+1)
+    - cron: '17 5 1 * *'  # mensual: keepalive
+  workflow_dispatch:
+
+jobs:
+  push:
+    if: github.event_name == 'workflow_dispatch' || github.event.schedule != '17 5 1 * *'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Instalar web-push
+        working-directory: tools
+        run: npm install web-push@3 --no-save --no-audit --no-fund
+      - name: Enviar aviso
+        working-directory: tools
+        env:
+          SCHEDULE: ${{ github.event.schedule }}
+          VAPID_PUBLIC_KEY: ${{ secrets.VAPID_PUBLIC_KEY }}
+          VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
+          PUSH_SUBSCRIPTIONS: ${{ secrets.PUSH_SUBSCRIPTIONS }}
+        run: node send-push.mjs
+
+  # GitHub desactiva los cron de repos públicos tras 60 días sin actividad.
+  keepalive:
+    if: github.event_name == 'schedule' && github.event.schedule == '17 5 1 * *'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Commit vacío si el último commit tiene más de 20 días
+        run: |
+          last=$(git log -1 --format=%ct)
+          age=$(( ( $(date +%s) - last ) / 86400 ))
+          echo "Último commit hace $age días"
+          if [ "$age" -gt 20 ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git commit --allow-empty -m "keepalive"
+            git push
+          fi
