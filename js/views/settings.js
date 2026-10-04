@@ -1,9 +1,9 @@
-// Ajustes y pantallas de gestión (familia, tareas, premios)
+// Ajustes y pantallas de gestión (familia y tareas)
 import * as S from '../store.js';
-import { todayKey, DAY_NAMES, DAY_ABBR } from '../dates.js';
+import { todayKey, addDays, DAY_NAMES, DAY_ABBR } from '../dates.js';
 import { h, avatar, signed, sheet, toast, confirmDialog, segmented, emptyState, pageHeader, applyTheme, plural } from '../ui.js';
 import { go, back } from '../router.js';
-import { childForm, taskForm, rewardForm, confirmDeleteChild } from './forms.js';
+import { childForm, taskForm, confirmDeleteChild } from './forms.js';
 
 const link = (emoji, title, detail, onclick) => h('button', { class: 'list-row', type: 'button', onclick },
   h('span', { class: 'row-emoji' }, emoji), h('span', { class: 'grow left' }, h('strong', null, title), detail ? h('small', null, detail) : null), h('span', { class: 'chev' }, '›'));
@@ -44,19 +44,14 @@ function importBackup() {
 }
 
 async function resetFlow() {
-  let mode = 'keep';
-  const opt = (v, label, hint) => h('label', { class: 'radio-row' },
-    h('input', { type: 'radio', name: 'rmode', value: v, checked: v === mode, onchange: () => { mode = v; } }), h('span', null, h('strong', null, label), h('small', null, hint)));
   const ok = await confirmDialog({
-    title: 'Reiniciar puntos', message: 'Elige cómo quieres reiniciar:', confirmText: 'Reiniciar', danger: true,
-    extra: h('div', { class: 'radio-group' },
-      opt('keep', 'Saldos a cero, conservar historial', 'Se añade un movimiento de reinicio por miembro.'),
-      opt('all', 'Borrarlo todo', 'Se elimina todo el historial de movimientos.')),
+    title: 'Reiniciar puntos', message: 'Se borrará todo el historial de puntos y las coronas volverán a empezar. Los miembros y las tareas se conservan.',
+    confirmText: 'Reiniciar', danger: true,
   });
   if (!ok) return;
-  const sure = await confirmDialog({ title: '¿Seguro?', message: mode === 'all' ? 'Se borrará todo el historial. No se puede deshacer.' : 'Todos los saldos volverán a 0.', confirmText: 'Sí, reiniciar', danger: true });
+  const sure = await confirmDialog({ title: '¿Seguro?', message: 'Se borrará todo el historial de movimientos. No se puede deshacer.', confirmText: 'Sí, reiniciar', danger: true });
   if (!sure) return;
-  S.resetPoints(mode);
+  S.resetPoints('all');
   toast('Puntos reiniciados');
 }
 
@@ -68,8 +63,7 @@ export function render(root) {
   root.append(h('h3', { class: 'section-title' }, 'Gestionar'),
     h('section', { class: 'card' },
       link('👨‍👩‍👧', 'Familia', `${S.activeChildren().length} ${plural(S.activeChildren().length, 'activo', 'activos')}`, () => go('/ajustes/familia')),
-      link('📝', 'Tareas y hábitos', `${st.tasks.length}`, () => go('/ajustes/tareas')),
-      link('🎁', 'Premios', `${st.rewards.length}`, () => go('/ajustes/premios'))));
+      link('📝', 'Tareas y hábitos', `${st.tasks.length}`, () => go('/ajustes/tareas'))));
 
   root.append(h('h3', { class: 'section-title' }, 'Preferencias'),
     h('section', { class: 'card pad form' },
@@ -79,12 +73,12 @@ export function render(root) {
       h('label', { class: 'field' }, h('span', { class: 'field-label' }, 'La semana empieza el'),
         h('select', { onchange: (e) => S.setSetting('weekStart', Number(e.target.value)) },
           [1, 0, 6].map((d) => h('option', { value: d, selected: st.settings.weekStart === d }, DAY_NAMES[d]))),
-        h('span', { class: 'hint' }, 'Afecta a las tareas semanales, al Rey y a las estadísticas.')),
-      h('label', { class: 'field' }, h('span', { class: 'field-label' }, '👑 Rey inicial'),
+        h('span', { class: 'hint' }, 'Afecta a las tareas semanales, a la corona y a las estadísticas.')),
+      h('label', { class: 'field' }, h('span', { class: 'field-label' }, '👑 Rey o Reina inicial'),
         h('select', { onchange: (e) => S.setInitialKing(e.target.value || null) },
           h('option', { value: '' }, 'Ninguno'),
           S.activeChildren().map((c) => h('option', { value: c.id, selected: st.settings.initialKing === c.id && st.settings.initialKingWeek === S.currentWeek() }, `${c.avatar} ${c.name}`))),
-        h('span', { class: 'hint' }, 'Rey de esta semana, cuando aún no hay una semana anterior con datos. Solo se aplica a la semana en que lo configuras.'))));
+        h('span', { class: 'hint' }, 'Rey o Reina de esta semana, cuando aún no hay una semana anterior con datos. Solo se aplica a la semana en que lo configuras.'))));
 
   root.append(h('h3', { class: 'section-title' }, 'Juez IA'),
     h('section', { class: 'card pad' },
@@ -101,7 +95,7 @@ export function render(root) {
     h('section', { class: 'card pad form' },
       h('button', { class: 'btn danger-soft block', type: 'button', onclick: resetFlow }, '🔄 Reiniciar puntos'),
       h('button', { class: 'btn danger-soft block', type: 'button', onclick: async () => {
-        const ok = await confirmDialog({ title: '¿Borrar todos los datos?', message: 'Se eliminarán miembros, tareas, premios e historial. Exporta una copia antes si la necesitas.', confirmText: 'Borrar todo', danger: true });
+        const ok = await confirmDialog({ title: '¿Borrar todos los datos?', message: 'Se eliminarán miembros, tareas e historial. Exporta una copia antes si la necesitas.', confirmText: 'Borrar todo', danger: true });
         if (ok) { S.wipeAll(); applyTheme('auto'); go('/hoy'); }
       } }, '🗑 Borrar todos los datos')));
 
@@ -134,7 +128,7 @@ export function renderChildren(root) {
   ]) },
   avatar(c, 40),
   h('span', { class: 'grow left' }, h('strong', null, c.name + (c.archived ? ' (archivado)' : '')),
-    h('small', null, `${c.role === 'parent' ? 'Adulto · ' : ''}${c.age !== '' && c.age != null ? c.age + ' años · ' : ''}Saldo ${S.balance(c.id)} · Total ${S.totalEarned(c.id)} · 🔥 ${S.childStreak(c.id)}`)),
+    h('small', null, `${c.role === 'parent' ? (c.gender === 'f' ? 'Adulta' : 'Adulto') + ' · ' : ''}${c.age !== '' && c.age != null ? c.age + ' años · ' : ''}Esta semana ${signed(S.pointsInRange(c.id, S.currentWeek(), addDays(S.currentWeek(), 6)))}${S.crownCount(c.id) ? ` · 👑×${S.crownCount(c.id)}` : ''} · 🔥 ${S.childStreak(c.id)}`)),
   h('span', { class: 'chev' }, '›'))));
   root.append(card);
 }
@@ -165,21 +159,3 @@ export function renderTasks(root) {
   root.append(card);
 }
 
-/* ---------- Premios ---------- */
-export function renderRewards(root) {
-  const rewards = S.getState().rewards;
-  root.append(subHeader('Premios', () => rewardForm(null)));
-  if (!rewards.length) { root.append(emptyState('🎁', 'Sin premios', 'Crea el primer premio.')); return; }
-  const card = h('section', { class: 'card' });
-  rewards.forEach((r) => {
-    const who = r.childIds.length ? r.childIds.map((id) => S.getChild(id)?.name).filter(Boolean).join(', ') : 'Todos';
-    card.append(h('button', { class: 'list-row', type: 'button', onclick: () => actionSheet(`${r.emoji} ${r.title}`, [
-      { label: '✏️ Editar', fn: () => rewardForm(r) },
-      { label: '🗑 Borrar', danger: true, fn: async () => { if (await confirmDialog({ title: `¿Borrar "${r.title}"?`, confirmText: 'Borrar', danger: true })) { S.deleteReward(r.id); toast('Premio borrado'); } } },
-    ]) },
-    h('span', { class: 'row-emoji' }, r.emoji),
-    h('span', { class: 'grow left' }, h('strong', null, r.title), h('small', null, who)),
-    h('span', { class: 'pts' }, `${r.cost} pts`)));
-  });
-  root.append(card);
-}

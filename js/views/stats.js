@@ -1,7 +1,7 @@
 // Estadísticas y resumen semanal
 import * as S from '../store.js';
 import { todayKey, weekStart, weekDays, addDays, formatWeekRange, DAY_SHORT, dow } from '../dates.js';
-import { h, avatar, signed, plural, emptyState, pageHeader } from '../ui.js';
+import { h, avatar, signed, plural, emptyState, pageHeader, royal } from '../ui.js';
 import { refresh } from '../router.js';
 
 let offset = 0;      // 0 = semana actual, -1 = anterior...
@@ -63,7 +63,7 @@ export function render(root) {
     h('button', { class: 'nav-btn', type: 'button', 'aria-label': 'Semana siguiente', disabled: offset >= 0, onclick: () => { offset++; refresh(); } }, '›')));
 
   // Ranking
-  const standing = S.weekStanding(ws); // el Rey de esa semana no compite y va aparte
+  const standing = S.weekStanding(ws); // el Rey o la Reina de esa semana no compite y va aparte
   const rank = standing.ranking.map((r) => ({ c: S.getChild(r.id), pts: r.points })).filter((r) => r.c);
   const top = Math.max(1, ...rank.map((r) => Math.abs(r.pts)));
   const medals = ['🥇', '🥈', '🥉'];
@@ -76,7 +76,7 @@ export function render(root) {
     h('span', { class: 'pts' + (r.pts < 0 ? ' neg' : '') }, signed(r.pts)))));
   const kingM = standing.king && S.getChild(standing.king);
   if (kingM) rc.append(h('div', { class: 'rank-row king-row' }, h('span', { class: 'medal' }, '👑'), avatar(kingM, 34),
-    h('div', { class: 'grow' }, h('strong', null, kingM.name), h('span', { class: 'king-tag' }, 'Rey · no compite'))));
+    h('div', { class: 'grow' }, h('strong', null, kingM.name), h('span', { class: 'king-tag' }, `${royal(kingM).title} · no compite`))));
   root.append(rc);
 
   // Selector de detalle
@@ -131,10 +131,10 @@ export function render(root) {
   });
   root.append(streakCard);
 
-  // Hall de Reyes
-  root.append(h('h3', { class: 'section-title' }, '👑 Hall de Reyes'));
+  // Hall de la Realeza
+  root.append(h('h3', { class: 'section-title' }, '👑 Hall de la Realeza'));
   const hist = S.kingHistory();
-  if (!hist.length) root.append(h('p', { class: 'muted pad' }, 'Aún no hay reyes. El ganador de cada semana será el Rey de la siguiente.'));
+  if (!hist.length) root.append(h('p', { class: 'muted pad' }, 'Aún no hay coronas. El ganador de cada semana será Rey o Reina de la siguiente.'));
   else {
     const crowns = new Map();
     hist.forEach((k) => crowns.set(k.king, (crowns.get(k.king) || 0) + 1));

@@ -39,6 +39,15 @@ export function applyTheme(theme) {
   if (theme === 'light' || theme === 'dark') root.dataset.theme = theme; else delete root.dataset.theme;
 }
 
+/* ---------- Rey / Reina ---------- */
+// Palabras correctas según el género del miembro ('f' = Reina; cualquier otro caso = Rey).
+export function royal(member) {
+  const q = member && member.gender === 'f';
+  return q
+    ? { title: 'Reina', theNew: 'la nueva Reina', the: 'la Reina', viva: '¡Viva la Reina!' }
+    : { title: 'Rey', theNew: 'el nuevo Rey', the: 'el Rey', viva: '¡Viva el Rey!' };
+}
+
 /* ---------- Avatar ---------- */
 // Si el miembro es el Rey de la semana actual, lleva una corona encima (crown = false para desactivarla).
 export function avatar(child, size = 40, crown = true) {
@@ -182,7 +191,6 @@ export function emojiPicker(value, suggestions) {
 }
 
 export const EMOJIS_TASK = ['🛏️', '🪥', '🧸', '📚', '🍽️', '📖', '🧽', '🧹', '👕', '🐶', '🌱', '🗑️', '🎒', '🛁', '💊', '🎹', '⚽', '🧠', '✏️', '😠', '📵', '🤝', '⭐', '💪'];
-export const EMOJIS_REWARD = ['📺', '🍕', '🛝', '🎬', '🍦', '🎁', '🎮', '🧁', '🚲', '🏊', '🛍️', '🌙', '🎨', '🍿', '🎢', '👑'];
 export const EMOJI_AVATAR_GROUPS = [
   { title: 'Héroes', items: ['🦸‍♂️', '🦸‍♀️', '🦹‍♂️', '🦹‍♀️', '🕷️', '🦇', '⚡', '🛡️', '🔨', '🦾', '🥷', '🤖', '🚀', '🐺', '🦅', '🔥'] },
   { title: 'Princesas y fantasía', items: ['👸', '🤴', '🧜‍♀️', '🧜‍♂️', '🧚‍♀️', '🧚‍♂️', '🦄', '🏰', '👑', '💎', '🌹', '❄️', '🐉', '🧞', '🧙‍♀️', '🧙‍♂️'] },

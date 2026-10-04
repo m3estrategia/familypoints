@@ -1,7 +1,7 @@
-// Componentes del Rey de la semana: clasificación en vivo y hoja de coronación.
+// Componentes del Rey/Reina de la semana: clasificación en vivo y hoja de coronación.
 import * as S from '../store.js';
 import { addDays, formatWeekRange } from '../dates.js';
-import { h, avatar, signed, plural, sheet, confetti, vibrate } from '../ui.js';
+import { h, avatar, signed, plural, sheet, confetti, vibrate, royal } from '../ui.js';
 
 const MEDALS = ['🥇', '🥈', '🥉'];
 
@@ -21,12 +21,12 @@ export function leagueCard() {
   const card = h('section', { class: 'card' },
     h('div', { class: 'league-head' }, h('strong', null, 'Clasificación de la semana'),
       h('small', null, `Quedan ${left} ${plural(left, 'día', 'días')}`)));
-  st.ranking.forEach((r, i) => card.append(rankRow(r, i, i === 0 && r.points > 0 ? 'Va camino de ser el próximo Rey 👑' : null)));
+  st.ranking.forEach((r, i) => card.append(rankRow(r, i, i === 0 && r.points > 0 ? `Va camino de ser ${S.getChild(r.id)?.gender === 'f' ? 'la próxima Reina' : 'el próximo Rey'} 👑` : null)));
   const king = st.king && S.getChild(st.king);
   if (king) {
     card.append(h('div', { class: 'rank-row king-row' },
       h('span', { class: 'medal' }, '👑'), avatar(king, 34),
-      h('div', { class: 'grow' }, h('strong', null, king.name), h('span', { class: 'king-tag' }, 'Rey · no compite'))));
+      h('div', { class: 'grow' }, h('strong', null, king.name), h('span', { class: 'king-tag' }, `${royal(king).title} · no compite`))));
   }
   return card;
 }
@@ -40,13 +40,13 @@ export function coronationSheet(week = S.currentWeek()) {
   const won = prev.winner && prev.winner.id === kingId ? prev.winner.points : null;
   const content = h('div', { class: 'coronation' },
     h('div', { class: 'big-crown' }, '👑'), avatar(king, 72),
-    h('h2', null, `¡${king.name} es el nuevo Rey!`),
-    won != null ? h('p', { class: 'muted' }, `Ganó la semana con ${won} ${plural(won, 'punto', 'puntos')}`) : h('p', { class: 'muted' }, 'Rey de esta semana'),
+    h('h2', null, `¡${king.name} es ${royal(king).theNew}!`),
+    won != null ? h('p', { class: 'muted' }, `Ganó la semana con ${won} ${plural(won, 'punto', 'puntos')}`) : h('p', { class: 'muted' }, `${royal(king).title} de esta semana`),
     h('p', { class: 'muted' }, 'Esta semana no compite: le toca repartir los puntos.'),
     prev.ranking.length ? h('section', { class: 'card', style: { width: '100%' } },
       h('div', { class: 'league-head' }, h('strong', null, 'Clasificación final'), h('small', null, formatWeekRange(prev.week))),
       prev.ranking.map((r, i) => rankRow(r, i))) : null,
-    h('button', { class: 'btn primary block', type: 'button', onclick: () => sh.close() }, '¡Viva el Rey!'));
+    h('button', { class: 'btn primary block', type: 'button', onclick: () => sh.close() }, royal(king).viva));
   const sh = sheet({ title: '👑 Coronación', content });
   confetti(140); vibrate([30, 50, 30, 50, 60]);
   return sh;

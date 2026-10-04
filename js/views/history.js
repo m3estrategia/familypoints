@@ -1,17 +1,17 @@
 // Historial de movimientos
 import * as S from '../store.js';
 import { formatRelativeDay, formatTime } from '../dates.js';
-import { h, avatar, signed, toast, vibrate, sheet, confirmDialog, emptyState, pageHeader } from '../ui.js';
+import { h, avatar, signed, toast, vibrate, sheet, confirmDialog, emptyState, pageHeader, royal } from '../ui.js';
 import { refresh } from '../router.js';
 
 const f = { child: 'all', type: 'all', limit: 100 };
-const TYPES = [['all', 'Todo'], ['task', 'Tareas'], ['manual', 'Manuales'], ['redeem', 'Canjes'], ['pending', 'Pendientes'], ['rejected', 'Rechazadas']];
+const TYPES = [['all', 'Todo'], ['task', 'Tareas'], ['manual', 'Manuales'], ['pending', 'Pendientes'], ['rejected', 'Rechazadas']];
 const STATUS = { pending: 'Pendiente de aprobar', approved: 'Aprobada', rejected: 'Rechazada', done: '' };
 const TYPE_LABEL = { task: 'Tarea', manual: 'Puntos manuales', redeem: 'Canje', reset: 'Reinicio' };
 
 function grantedLabel(e) {
   const k = e.grantedBy && S.getChild(e.grantedBy);
-  return k ? `otorgado por 👑 ${k.name}` : '';
+  return k ? `otorgado por 👑 ${royal(k).the} ${k.name}` : '';
 }
 
 function matches(e) {
@@ -34,7 +34,7 @@ function openEntry(e) {
       ? h('button', { class: 'btn block', type: 'button', onclick: () => { S.setEntryStatus(e.id, 'pending'); sh.close(); toast('Vuelve a estar pendiente de aprobar'); } }, '↩︎ Volver a pendiente')
       : null,
     h('button', { class: 'btn danger-soft block', type: 'button', onclick: async () => {
-      const ok = await confirmDialog({ title: '¿Deshacer este movimiento?', message: 'Se borrará del historial y el saldo se recalculará.', confirmText: 'Deshacer y borrar', danger: true });
+      const ok = await confirmDialog({ title: '¿Deshacer este movimiento?', message: 'Se borrará del historial y los puntos se recalcularán.', confirmText: 'Deshacer y borrar', danger: true });
       if (ok) { S.removeEntry(e.id); vibrate(15); sh.close(); toast('Movimiento borrado'); }
     } }, '🗑 Deshacer / borrar'));
   const sh = sheet({ title: 'Movimiento', content: body });
@@ -43,7 +43,7 @@ function openEntry(e) {
 export function render(root) {
   const kids = S.getState().children;
   root.append(pageHeader('Historial'));
-  if (!S.getState().ledger.length) { root.append(emptyState('🕘', 'Sin movimientos', 'Aquí aparecerán las tareas, puntos y canjes.')); return; }
+  if (!S.getState().ledger.length) { root.append(emptyState('🕘', 'Sin movimientos', 'Aquí aparecerán las tareas y los puntos.')); return; }
   root.append(h('div', { class: 'chips scroll' },
     [{ id: 'all', avatar: '👨‍👩‍👧', name: 'Todos' }, ...kids].map((c) => h('button', {
       class: 'chip' + (f.child === c.id ? ' on' : ''), onclick: () => { f.child = c.id; f.limit = 100; refresh(); },

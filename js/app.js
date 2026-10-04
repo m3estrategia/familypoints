@@ -4,7 +4,6 @@ import * as router from './router.js';
 import { h, clear, applyTheme } from './ui.js';
 import * as today from './views/today.js';
 import * as approvals from './views/approvals.js';
-import * as rewards from './views/rewards.js';
 import * as history from './views/history.js';
 import * as stats from './views/stats.js';
 import * as settings from './views/settings.js';
@@ -15,7 +14,6 @@ applyTheme(S.getState().settings.theme);
 
 const TABS = [
   { path: '/hoy', label: 'Hoy', icon: '☀️' },
-  { path: '/recompensas', label: 'Premios', icon: '🎁' },
   { path: '/historial', label: 'Historial', icon: '🕘' },
   { path: '/estadisticas', label: 'Estadísticas', icon: '📊' },
   { path: '/ajustes', label: 'Ajustes', icon: '⚙️' },
@@ -23,13 +21,11 @@ const TABS = [
 const ROUTES = {
   '/hoy': { view: today, tab: '/hoy' },
   '/aprobaciones': { view: approvals, tab: '/hoy' },
-  '/recompensas': { view: rewards, tab: '/recompensas' },
   '/historial': { view: history, tab: '/historial' },
   '/estadisticas': { view: stats, tab: '/estadisticas' },
   '/ajustes': { view: settings, tab: '/ajustes' },
   '/ajustes/familia': { view: { render: settings.renderChildren }, tab: '/ajustes' },
   '/ajustes/tareas': { view: { render: settings.renderTasks }, tab: '/ajustes' },
-  '/ajustes/premios': { view: { render: settings.renderRewards }, tab: '/ajustes' },
 };
 Object.keys(ROUTES).forEach((p) => router.register(p, ROUTES[p]));
 

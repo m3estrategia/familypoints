@@ -1,7 +1,7 @@
 // Pantalla Hoy
 import * as S from '../store.js';
 import { todayKey, formatLong, weekStart, addDays } from '../dates.js';
-import { h, avatar, signed, plural, vibrate, confetti, toast, emptyState, pageHeader } from '../ui.js';
+import { h, avatar, signed, plural, vibrate, confetti, toast, emptyState, pageHeader, royal } from '../ui.js';
 import { manualForm, childForm } from './forms.js';
 import { go } from '../router.js';
 import { leagueCard } from './crown.js';
@@ -20,7 +20,7 @@ function chips(children, selected, onPick) {
 
 function complete(task, child) {
   const e = S.completeTask(task.id, child.id);
-  if (!e) { toast(`👑 ${child.name} es el Rey: no puede ganar puntos esta semana`); return; }
+  if (!e) { toast(`👑 ${child.name} es ${royal(child).the}: no puede ganar puntos esta semana`); return; }
   vibrate(e.status === 'pending' ? 20 : [15, 40, 15]);
   if (e.status === 'pending') toast(`⏳ "${task.title}" pendiente de aprobar`, { label: 'Deshacer', fn: () => S.removeEntry(e.id) });
   else {
@@ -78,12 +78,12 @@ export function render(root) {
   const scopeId = sel === 'all' ? null : sel;
   const todayPts = S.pointsInRange(scopeId, today, today);
   const weekPts = S.pointsInRange(scopeId, ws, addDays(ws, 6));
-  const bal = scopeId ? S.balance(scopeId) : null;
+  const crowns = scopeId ? S.crownCount(scopeId) : 0;
   const streak = scopeId ? S.childStreak(scopeId) : null;
   root.append(h('section', { class: 'summary' },
     h('div', { class: 'sum-item' }, h('span', { class: 'sum-num' }, signed(todayPts)), h('span', { class: 'sum-lbl' }, 'puntos hoy')),
     h('div', { class: 'sum-item' }, h('span', { class: 'sum-num' }, signed(weekPts)), h('span', { class: 'sum-lbl' }, 'esta semana')),
-    scopeId ? h('div', { class: 'sum-item' }, h('span', { class: 'sum-num' }, '⭐ ' + bal), h('span', { class: 'sum-lbl' }, 'saldo')) : null,
+    scopeId && crowns ? h('div', { class: 'sum-item' }, h('span', { class: 'sum-num' }, '👑 ×' + crowns), h('span', { class: 'sum-lbl' }, plural(crowns, 'corona', 'coronas'))) : null,
     scopeId && streak ? h('div', { class: 'sum-item' }, h('span', { class: 'sum-num' }, '🔥 ' + streak), h('span', { class: 'sum-lbl' }, plural(streak, 'día de racha', 'días de racha'))) : null));
 
   if (kids.length > 1 || S.currentKingId()) root.append(leagueCard());
@@ -91,7 +91,7 @@ export function render(root) {
   if (pending) {
     const kingNow = S.currentKingId() && S.getChild(S.currentKingId());
     root.append(h('button', { class: 'banner', type: 'button', onclick: () => go('/aprobaciones') },
-      h('span', null, `✋ ${pending} ${plural(pending, 'tarea pendiente', 'tareas pendientes')} de aprobar${kingNow ? ' · 👑 Decide ' + kingNow.name : ''}`), h('span', null, 'Revisar ›')));
+      h('span', null, `✋ ${pending} ${plural(pending, 'tarea pendiente', 'tareas pendientes')} de aprobar${kingNow ? ` · 👑 Decide ${royal(kingNow).the} ${kingNow.name}` : ''}`), h('span', null, 'Revisar ›')));
   }
 
   if (kids.length > 1) root.append(chips(kids, sel, (id) => S.setSetting('lastChild', id)));
@@ -105,8 +105,8 @@ export function render(root) {
   for (const child of shown) {
     if (child.id === S.currentKingId()) {
       root.append(h('section', { class: 'card king-card' }, avatar(child, 44),
-        h('div', { class: 'grow' }, h('strong', null, `👑 ${child.name} es el Rey esta semana: reparte los puntos`),
-          h('small', { class: 'muted' }, 'El Rey no compite ni gana puntos durante su semana.'))));
+        h('div', { class: 'grow' }, h('strong', null, `👑 ${child.name} es ${royal(child).the} esta semana: reparte los puntos`),
+          h('small', { class: 'muted' }, `${royal(child).the[0].toUpperCase() + royal(child).the.slice(1)} no compite ni gana puntos durante su semana.`))));
       continue;
     }
     const items = S.tasksForDay(child.id, today);
@@ -116,7 +116,7 @@ export function render(root) {
     if (sel === 'all') {
       card.append(h('div', { class: 'child-head' }, avatar(child, 36),
         h('div', { class: 'grow' }, h('strong', null, child.name), h('small', null, `${doneItems.length}/${items.length} hechas`)),
-        h('span', { class: 'balance', style: { color: child.color } }, '⭐ ' + S.balance(child.id))));
+        h('span', { class: 'balance', style: { color: child.color } }, signed(S.pointsInRange(child.id, ws, addDays(ws, 6))) + ' pts', S.crownCount(child.id) ? ` · 👑×${S.crownCount(child.id)}` : '')));
     }
     if (!items.length) card.append(h('p', { class: 'muted pad' }, 'No hay tareas para hoy 🎉'));
     else {

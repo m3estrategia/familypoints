@@ -2,9 +2,9 @@
 import { todayKey, addDays, dow, weekStart, diffDays } from './dates.js';
 export const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 
-export const APP_VERSION = '1.1.0';
+export const APP_VERSION = '1.2.0';
 export const STORAGE_KEY = 'fp:v1'; // se mantiene la clave para no perder datos de la v1
-export const SCHEMA_VERSION = 2;
+export const SCHEMA_VERSION = 3;
 
 const defaults = () => ({
   schema: SCHEMA_VERSION,
@@ -18,11 +18,26 @@ const defaults = () => ({
   ledger: [],
 });
 
+// Género de cada miembro ('f' | 'm'), deducido del avatar o del nombre cuando falta (migración v2 -> v3).
+const noVS = (x) => String(x || '').replace(/️/g, '');
+const FEMALE_AVATARS = ['👸', '👩', '👧', '👵', '🧜‍♀️', '🧚‍♀️', '🦸‍♀️', '🦹‍♀️', '🧙‍♀️', '👱‍♀️', '💃', '👰', '🤰'].map(noVS);
+const FEMALE_NAMES = ['mamá', 'mama', 'abuela', 'tía'];
+export function guessGender(c) {
+  if (FEMALE_AVATARS.includes(noVS(c.avatar))) return 'f';
+  if (FEMALE_NAMES.includes(String(c.name || '').trim().toLowerCase())) return 'f';
+  return 'm';
+}
+
 // Migraciones: migrations[n] convierte de la versión n a n+1.
 const migrations = {
   // v1 -> v2: los perfiles pasan a ser miembros de la familia con rol (todo lo existente son niños).
   1: (s) => {
     (Array.isArray(s.children) ? s.children : []).forEach((c) => { if (!c.role) c.role = 'child'; });
+    return s;
+  },
+  // v2 -> v3: cada miembro tiene género (para Rey / Reina).
+  2: (s) => {
+    (Array.isArray(s.children) ? s.children : []).forEach((c) => { if (c.gender !== 'f' && c.gender !== 'm') c.gender = guessGender(c); });
     return s;
   },
 };
@@ -34,6 +49,7 @@ export function migrate(raw) {
   const out = { ...d, ...s, settings: { ...d.settings, ...(s.settings || {}) }, schema: SCHEMA_VERSION };
   for (const k of ['children', 'tasks', 'rewards', 'ledger']) if (!Array.isArray(out[k])) out[k] = [];
   out.children.forEach((c) => { if (c.role !== 'parent' && c.role !== 'child') c.role = 'child'; });
+  out.children.forEach((c) => { if (c.gender !== 'f' && c.gender !== 'm') c.gender = guessGender(c); });
   repairMissingIds(out);
   return out;
 }
@@ -101,6 +117,8 @@ export function saveChild(data) {
     return c.id;
   });
 }
+// Coronas ganadas (semanas en las que fue Rey o Reina, incluida la actual).
+export const crownCount = (id) => kingHistory().filter((k) => k.king === id).length;
 export const archiveChild = (id, v = true) => commit((s) => { s.children.find((c) => c.id === id).archived = v; });
 export function deleteChild(id) {
   commit((s) => {

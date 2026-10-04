@@ -45,6 +45,6 @@ Ajustes -> Exportar copia (abre el menú de compartir o descarga un `.json`) e I
 
 ## Notas de diseño
 
-- El saldo se calcula siempre a partir del ledger de movimientos; deshacer = borrar o cambiar el estado del movimiento.
+- Cada semana hay un Rey o una Reina (según el género del miembro). La clasificación y las coronas se derivan siempre a partir del ledger de movimientos; deshacer = borrar o cambiar el estado del movimiento.
 - Las tareas "se reinician" de forma derivada (diarias por fecha, semanales por semana según el día de inicio configurado).
 - Las tareas con puntos negativos (penalizaciones) se pueden aplicar varias veces al día.

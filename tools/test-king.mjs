@@ -150,7 +150,7 @@ test('migración desde datos v1 sin pérdida', async () => {
   const copy = JSON.parse(JSON.stringify(v1));
   const S = await load(v1);
   const st = S.getState();
-  assert.equal(st.schema, 2);
+  assert.equal(st.schema, 3);
   assert.ok(st.children.every((c) => c.role === 'child'));
   assert.equal(st.children[0].name, 'Ana');
   assert.equal(st.children[1].archived, true);
@@ -165,7 +165,26 @@ test('migración desde datos v1 sin pérdida', async () => {
   // Importar una copia v1 también migra
   S.importJSON(JSON.stringify({ app: 'FamilyPoints', data: copy }));
   assert.equal(S.getState().children[0].role, 'child');
-  assert.equal(S.APP_VERSION, '1.1.0');
+  assert.equal(S.APP_VERSION, '1.2.0');
+  assert.ok(S.getState().children.every((c) => c.gender === 'm' || c.gender === 'f'));
+});
+
+test('migración de gender: avatar y nombre', async () => {
+  const mk = (id, name, avatar, extra = {}) => ({ id, name, avatar, color: '#fff', archived: false, role: 'child', ...extra });
+  const S = await load({ schema: 2, settings: { weekStart: 1, onboarded: true }, tasks: [], rewards: [], ledger: [],
+    children: [mk('p', 'Ana', '👸'), mk('l', 'Leo', '🦁'), mk('m', 'Mamá', '🙂', { role: 'parent' }), mk('a', 'abuela', '🙂'),
+      mk('s', 'Sira', '🦸‍♀️'), mk('v', 'Eva', '🧜‍♀️'), mk('k', 'Kai', '🙂', { gender: 'f' })] });
+  const g = Object.fromEntries(S.getState().children.map((c) => [c.id, c.gender]));
+  assert.deepEqual(g, { p: 'f', l: 'm', m: 'f', a: 'f', s: 'f', v: 'f', k: 'f' });
+  assert.equal(S.getState().schema, 3);
+});
+
+test('royal() devuelve las palabras según el género', async () => {
+  await load(base([]));
+  const { royal } = await import('../js/ui.js');
+  assert.deepEqual(royal({ gender: 'f' }), { title: 'Reina', theNew: 'la nueva Reina', the: 'la Reina', viva: '¡Viva la Reina!' });
+  assert.deepEqual(royal({ gender: 'm' }), { title: 'Rey', theNew: 'el nuevo Rey', the: 'el Rey', viva: '¡Viva el Rey!' });
+  assert.equal(royal(undefined).title, 'Rey');
 });
 
 let fail = 0;

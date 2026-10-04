@@ -1,9 +1,9 @@
-// Formularios en hojas modales: miembros, tareas, premios y puntos manuales.
+// Formularios en hojas modales: miembros, tareas y puntos manuales.
 import * as S from '../store.js';
 import { DAY_SHORT, DAY_NAMES, todayKey } from '../dates.js';
 import {
   h, sheet, field, segmented, emojiPicker, colorPicker, childMultiSelect, toast, confirmDialog, vibrate, confetti,
-  avatar, EMOJIS_AVATAR, EMOJI_AVATAR_GROUPS, EMOJIS_TASK, EMOJIS_REWARD, COLORS, signed,
+  avatar, EMOJIS_AVATAR, EMOJI_AVATAR_GROUPS, EMOJIS_TASK, COLORS, signed, royal,
 } from '../ui.js';
 import { suggestPoints } from '../ai-judge.js';
 
@@ -11,22 +11,34 @@ const num = (v, d = 0) => { const n = parseInt(v, 10); return Number.isFinite(n)
 
 /* ---------- Miembro de la familia ---------- */
 export function childForm(child, onSaved) {
-  const data = { name: child?.name || '', avatar: child?.avatar || EMOJIS_AVATAR[0], color: child?.color || COLORS[S.getState().children.length % COLORS.length], age: child?.age ?? '', role: child?.role || 'child' };
+  const data = { name: child?.name || '', avatar: child?.avatar || EMOJIS_AVATAR[0], color: child?.color || COLORS[S.getState().children.length % COLORS.length], age: child?.age ?? '', role: child?.role || 'child', gender: child?.gender || null };
   const name = h('input', { type: 'text', value: data.name, placeholder: 'Nombre', maxLength: 30, autocomplete: 'off' });
   const age = h('input', { type: 'number', inputMode: 'numeric', value: data.age, placeholder: 'Opcional', min: 0, max: 120 });
   const ep = emojiPicker(data.avatar, EMOJI_AVATAR_GROUPS);
   const cp = colorPicker(data.color, (c) => { data.color = c; });
+  const genderField = h('div', { class: 'field' });
+  const renderGender = () => {
+    const adult = data.role === 'parent';
+    if (data.gender !== 'f' && data.gender !== 'm') data.gender = 'm';
+    genderField.replaceChildren(h('span', { class: 'field-label' }, 'Género'),
+      segmented(adult ? [{ value: 'm', label: 'Hombre' }, { value: 'f', label: 'Mujer' }] : [{ value: 'm', label: 'Chico' }, { value: 'f', label: 'Chica' }], data.gender, (v) => { data.gender = v; }),
+      h('span', { class: 'hint' }, 'Decide si será Rey o Reina.'));
+  };
+  if (!child) data.gender = 'm';
+  else if (!data.gender) data.gender = S.guessGender(child);
+  renderGender();
   const form = h('form', { class: 'form', onsubmit: (e) => {
     e.preventDefault();
     const n = name.value.trim();
     if (!n) { name.focus(); toast('Escribe un nombre'); return; }
-    const id = S.saveChild({ id: child?.id, name: n, avatar: ep.get() || EMOJIS_AVATAR[0], color: data.color, age: age.value === '' ? '' : num(age.value), role: data.role });
+    const id = S.saveChild({ id: child?.id, name: n, avatar: ep.get() || EMOJIS_AVATAR[0], color: data.color, age: age.value === '' ? '' : num(age.value), role: data.role, gender: data.gender });
     sh.close();
     if (onSaved) onSaved(id);
   } },
   field('Nombre', name),
   h('div', { class: 'field' }, h('span', { class: 'field-label' }, 'Rol'),
-    segmented([{ value: 'parent', label: 'Adulto' }, { value: 'child', label: 'Niño' }], data.role, (v) => { data.role = v; })),
+    segmented([{ value: 'parent', label: 'Adulto' }, { value: 'child', label: 'Niño' }], data.role, (v) => { data.role = v; renderGender(); })),
+  genderField,
   ep.el, cp, field('Edad', age),
   h('button', { class: 'btn primary block', type: 'submit' }, child ? 'Guardar' : 'Añadir miembro'));
   const sh = sheet({ title: child ? 'Editar miembro' : 'Nuevo miembro', content: form });
@@ -92,27 +104,6 @@ export function taskForm(task, onSaved) {
   return sh;
 }
 
-/* ---------- Premio ---------- */
-export function rewardForm(reward, onSaved) {
-  const kids = S.activeChildren();
-  const title = h('input', { type: 'text', value: reward?.title || '', placeholder: 'Ej.: Salida al parque', maxLength: 60, autocomplete: 'off' });
-  const ep = emojiPicker(reward?.emoji || '🎁', EMOJIS_REWARD);
-  const cost = h('input', { type: 'number', inputMode: 'numeric', value: reward?.cost ?? 10, min: 1, max: 100000 });
-  const who = childMultiSelect(kids, (reward?.childIds || []).filter((id) => kids.some((k) => k.id === id)), 'Disponible para');
-  const form = h('form', { class: 'form', onsubmit: (e) => {
-    e.preventDefault();
-    const t = title.value.trim();
-    if (!t) { title.focus(); toast('Escribe un título'); return; }
-    const id = S.saveReward({ id: reward?.id, title: t, emoji: ep.get() || '🎁', cost: Math.max(1, num(cost.value, 1)), childIds: who.get() });
-    sh.close();
-    if (onSaved) onSaved(id);
-  } },
-  field('Título', title), ep.el, field('Coste en puntos', cost), who.el,
-  h('button', { class: 'btn primary block', type: 'submit' }, reward ? 'Guardar' : 'Crear premio'));
-  const sh = sheet({ title: reward ? 'Editar premio' : 'Nuevo premio', content: form });
-  return sh;
-}
-
 /* ---------- Puntos manuales ---------- */
 export function manualForm(childId) {
   const king = S.currentKingId();
@@ -147,7 +138,7 @@ export function manualForm(childId) {
     sh.close();
   } },
   h('div', { class: 'field' }, h('span', { class: 'field-label' }, 'Miembro'), kidRow),
-  king ? h('p', { class: 'decides' }, '👑 Decide ' + S.getChild(king).name) : null,
+  king ? h('p', { class: 'decides' }, `👑 Decide ${royal(S.getChild(king)).the} ${S.getChild(king).name}`) : null,
   signSeg, field('Puntos', pts), field('Motivo', reason), ep.el, judge,
   h('button', { class: 'btn primary block', type: 'submit' }, 'Guardar'));
   const sh = sheet({ title: 'Puntos manuales', content: form, full: true });

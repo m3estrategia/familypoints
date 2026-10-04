@@ -1,7 +1,7 @@
 // Bandeja de aprobaciones
 import * as S from '../store.js';
 import { formatRelativeDay, formatTime } from '../dates.js';
-import { h, avatar, signed, vibrate, confetti, toast, emptyState, pageHeader } from '../ui.js';
+import { h, avatar, signed, vibrate, confetti, toast, emptyState, pageHeader, royal } from '../ui.js';
 import { back } from '../router.js';
 
 export function render(root) {
@@ -9,7 +9,7 @@ export function render(root) {
   root.append(pageHeader('Aprobaciones', null, h('button', { class: 'btn-text', type: 'button', onclick: () => back('/hoy') }, '‹ Hoy')));
   if (!list.length) { root.append(emptyState('✅', 'Todo al día', 'No hay tareas pendientes de aprobar.')); return; }
   const king = S.currentKingId() && S.getChild(S.currentKingId());
-  if (king) root.append(h('p', { class: 'decides' }, '👑 Decide ' + king.name));
+  if (king) root.append(h('p', { class: 'decides' }, `👑 Decide ${royal(king).the} ${king.name}`));
   const card = h('section', { class: 'card' });
   list.forEach((e) => {
     const child = S.getChild(e.childId);
